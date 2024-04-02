@@ -29,8 +29,8 @@ contract MyContract {
 
     mapping(address => Backer) public backers;
     mapping(uint256 => Campaign) public campaigns;
+
     uint256 numberOfCampaigns = 0;
-    uint256 numberOfBackers = 0;
 
     event CampaignCreated(
         uint256 indexed campaignId,
@@ -38,6 +38,17 @@ contract MyContract {
         string title,
         uint256 target,
         uint deadline
+    );
+
+    event CampaignLog(
+        uint256 campaignId,
+        address owner,
+        string title,
+        string description,
+        uint256 target,
+        uint256 deadline,
+        uint256 amountCollected,
+        uint256 amountNotYetSend
     );
 
     function createCampaign(
@@ -97,6 +108,17 @@ contract MyContract {
         }
         campaign.amountCollected += amount;
         campaign.amountNotYetSend += amount;
+
+        emit CampaignLog(
+            _id,
+            campaign.owner,
+            campaign.title,
+            campaign.description,
+            campaign.target,
+            campaign.deadline,
+            campaign.amountCollected,
+            campaign.amountNotYetSend
+        );
     }
 
     function getCampaign(
@@ -139,6 +161,16 @@ contract MyContract {
             }("");
             require(sent, "Failed to send Ether");
             campaign.amountNotYetSend = 0;
+        emit CampaignLog(
+            i,
+            campaign.owner,
+            campaign.title,
+            campaign.description,
+            campaign.target,
+            campaign.deadline,
+            campaign.amountCollected,
+            campaign.amountNotYetSend
+        );
         }
     }
 
