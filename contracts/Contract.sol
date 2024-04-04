@@ -161,16 +161,16 @@ contract MyContract {
             }("");
             require(sent, "Failed to send Ether");
             campaign.amountNotYetSend = 0;
-        emit CampaignLog(
-            i,
-            campaign.owner,
-            campaign.title,
-            campaign.description,
-            campaign.target,
-            campaign.deadline,
-            campaign.amountCollected,
-            campaign.amountNotYetSend
-        );
+            emit CampaignLog(
+                i,
+                campaign.owner,
+                campaign.title,
+                campaign.description,
+                campaign.target,
+                campaign.deadline,
+                campaign.amountCollected,
+                campaign.amountNotYetSend
+            );
         }
     }
 
@@ -215,5 +215,29 @@ contract MyContract {
         uint256 _campaignId
     ) public view returns (string[] memory) {
         return campaigns[_campaignId].proofsOfWork;
+    }
+
+    // display
+
+    function getAllCampaigns() public view returns (uint256) {
+        return numberOfCampaigns;
+    }
+
+    function getTotalFundsRaised() public view returns (uint256) {
+        uint256 totalFundsRaised = 0;
+        for (uint256 i = 0; i < numberOfCampaigns; i++) {
+            totalFundsRaised += campaigns[i].amountCollected;
+        }
+        return totalFundsRaised;
+    }
+
+    function getActiveCampaignCount() public view returns (uint256) {
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < numberOfCampaigns; i++) {
+            if (campaigns[i].deadline > block.timestamp) {
+                activeCount++;
+            }
+        }
+        return activeCount;
     }
 }
