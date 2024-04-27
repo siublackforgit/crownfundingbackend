@@ -88,7 +88,8 @@ contract MyContract {
             block.timestamp < campaign.deadline,
             "The funding deadline has passed."
         );
-        require(campaign.amountCollected < campaign.target);
+        require(campaign.amountCollected <= campaign.target,"Campaign already reach its target");
+        require(campaign.amountCollected + amount <= campaign.target,"Donation cannot exceeds the campaign target.");
         require(amount > 0, "Donation amount must be greater than zero");
 
         campaign.donators.push(msg.sender);
