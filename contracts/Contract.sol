@@ -302,5 +302,20 @@ contract MyContract {
     }
 
     // fund
-
+    function releaseFundForEndedCampaign(uint256 _id) public payable {
+        Campaign storage campaign = campaigns[_id];
+        require(_id < numberOfCampaigns, "current Id is not exit");
+        require(campaign.amountNotYetSend > 0, "current Id is not exit");
+        // require(block.timestamp < campaign.deadline);
+        if (campaign.amountNotYetSend > 0) {
+            (bool sent, ) = payable(campaign.owner).call{
+                value: campaign.amountNotYetSend
+            }("");
+            require(sent, "Failed to send Ether");
+            campaign.amountSendToDonator =
+                campaign.amountSendToDonator +
+                campaign.amountNotYetSend;
+            campaign.amountNotYetSend = 0;
+        }
+    }
 }
