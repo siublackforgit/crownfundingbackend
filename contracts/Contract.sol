@@ -60,8 +60,15 @@ contract MyContract {
         uint256 amountNotYetSend,
         uint256 amountSendToNgo
     );
+    event ReleaseFundForEndedCampaign(
+        uint256 campaignId,
+        uint256 amountNotYetSend,
+        uint256 amountSendToDonator
+    );
 
     // function
+
+    // create
 
     function createCampaign(
         address _owner,
@@ -84,6 +91,10 @@ contract MyContract {
         campaign.deadline = _deadline;
         campaign.description = _description;
         campaign.campaignId = numberOfCampaigns++;
+        campaign.amountCollected = 0;
+        campaign.amountNotYetSend = 0;
+        campaign.amountSendToDonator = 0;
+        campaign.amountSendToNgo = 0;
         campaign.active = true;
 
         campaignsID.push(campaign.campaignId);
@@ -91,47 +102,7 @@ contract MyContract {
         return numberOfCampaigns - 1;
     }
 
-    function donateCampaign(uint256 _id) public payable {
-        Campaign storage campaign = campaigns[_id];
-        Backer storage backer = backers[msg.sender];
-        uint256 amount = msg.value;
-        require(_id < numberOfCampaigns, "Campaign does not exist.");
-        require(
-            block.timestamp < campaign.deadline,
-            "The funding deadline has passed."
-        );
-        require(
-            campaign.amountCollected <= campaign.target,
-            "Campaign already reach its target"
-        );
-        require(
-            campaign.amountCollected + amount <= campaign.target,
-            "Donation cannot exceeds the campaign target."
-        );
-        require(amount > 0, "Donation amount must be greater than zero");
-
-        campaign.donators.push(msg.sender);
-        campaign.donations.push(amount);
-
-        backer.owner = msg.sender;
-        backer.donations[_id] += msg.value;
-
-        bool hasAlreadyBacked = false;
-        for (uint256 i = 0; i < backer.campaignsBacked.length; i++) {
-            if (backer.campaignsBacked[i] == _id) {
-                hasAlreadyBacked = true;
-                break;
-            }
-        }
-
-        if (!hasAlreadyBacked) {
-            backer.campaignsBacked.push(_id);
-        }
-        campaign.amountCollected += amount;
-        campaign.amountNotYetSend += amount;
-
-        emit AmountCollectedUpdated(_id, msg.value);
-    }
+    // display
 
     function getCampaign(
         uint256 _id
@@ -185,54 +156,6 @@ contract MyContract {
         return backer.campaignsBacked;
     }
 
-    function releaseFund(uint256 _id, address _backerAddress) public payable {
-        Campaign storage campaign = campaigns[_id];
-        Backer storage backer = backers[_backerAddress];
-        require(_id < numberOfCampaigns);
-        require(block.timestamp < campaign.deadline);
-        uint256 backerDonations = backer.donations[_id];
-        if (backerDonations != 0) {
-            (bool sent, ) = payable(campaign.owner).call{
-                value: backerDonations
-            }("");
-            require(sent, "Failed to send Ether");
-            backer.donations[_id] = 0;
-            campaign.amountNotYetSend -= backer.donations[_id];
-            campaign.amountSendToDonator += backer.donations[_id];
-            emit ReleaseFund(
-                _id,
-                campaign.amountNotYetSend,
-                campaign.amountSendToDonator
-            );
-        }
-    }
-
-    function cancelFund(
-        uint256 _id,
-        address _backerAddress,
-        address _ngoAddress
-    ) public payable {
-        Campaign storage campaign = campaigns[_id];
-        Backer storage backer = backers[_backerAddress];
-        require(_id < numberOfCampaigns);
-        require(block.timestamp < campaign.deadline);
-        uint256 backerDonations = backer.donations[_id];
-        if (backerDonations != 0) {
-            (bool sent, ) = payable(_ngoAddress).call{value: backerDonations}(
-                ""
-            );
-            require(sent, "Failed to send Ether");
-            backer.donations[_id] = 0;
-            campaign.amountNotYetSend -= backer.donations[_id];
-            campaign.amountSendToNgo += backer.donations[_id];
-            emit CancelFund(
-                _id,
-                campaign.amountNotYetSend,
-                campaign.amountSendToNgo
-            );
-        }
-    }
-
     function displayFund(
         uint256 _id,
         address _backerAddress
@@ -244,33 +167,6 @@ contract MyContract {
         uint256 backerDonations = backer.donations[_id];
         return backerDonations;
     }
-
-    function addProofOfWork(
-        uint256 _campaignId,
-        string memory _dataType,
-        string memory _content,
-        string memory _description
-    ) public {
-        Campaign storage campaign = campaigns[_campaignId];
-        require(
-            msg.sender == campaign.owner,
-            "Only the campaign owner can add proof of work"
-        );
-        ProofOfWork memory newProofOfWork = ProofOfWork({
-            dataType: _dataType,
-            content: _content,
-            description: _description
-        });
-        campaign.proofsOfWork.push(newProofOfWork);
-    }
-
-    function getProofsOfWork(
-        uint256 _campaignId
-    ) public view returns (ProofOfWork[] memory) {
-        return campaigns[_campaignId].proofsOfWork;
-    }
-
-    // display
 
     function getAllCampaigns() public view returns (uint256) {
         return numberOfCampaigns;
@@ -302,11 +198,105 @@ contract MyContract {
     }
 
     // fund
+
+    function donateCampaign(uint256 _id) public payable {
+        Campaign storage campaign = campaigns[_id];
+        Backer storage backer = backers[msg.sender];
+        uint256 amount = msg.value;
+        require(_id < numberOfCampaigns, "Campaign does not exist.");
+        require(
+            block.timestamp < campaign.deadline,
+            "The funding deadline has passed."
+        );
+        require(
+            campaign.amountCollected <= campaign.target,
+            "Campaign already reach its target"
+        );
+        require(
+            campaign.amountCollected + amount <= campaign.target,
+            "Donation cannot exceeds the campaign target."
+        );
+        require(amount > 0, "Donation amount must be greater than zero");
+
+        campaign.donators.push(msg.sender);
+        campaign.donations.push(amount);
+
+        backer.owner = msg.sender;
+        backer.donations[_id] += msg.value;
+
+        bool hasAlreadyBacked = false;
+        for (uint256 i = 0; i < backer.campaignsBacked.length; i++) {
+            if (backer.campaignsBacked[i] == _id) {
+                hasAlreadyBacked = true;
+                break;
+            }
+        }
+
+        if (!hasAlreadyBacked) {
+            backer.campaignsBacked.push(_id);
+        }
+        campaign.amountCollected += amount;
+        campaign.amountNotYetSend += amount;
+
+        emit AmountCollectedUpdated(_id, msg.value);
+    }
+
+    function cancelFund(
+        uint256 _id,
+        address _backerAddress,
+        address _ngoAddress
+    ) public payable {
+        Campaign storage campaign = campaigns[_id];
+        Backer storage backer = backers[_backerAddress];
+        require(_id < numberOfCampaigns);
+        require(block.timestamp < campaign.deadline);
+        uint256 backerDonations = backer.donations[_id];
+        if (backerDonations != 0) {
+            (bool sent, ) = payable(_ngoAddress).call{value: backerDonations}(
+                ""
+            );
+            require(sent, "Failed to send Ether");
+            backer.donations[_id] = 0;
+            campaign.amountNotYetSend -= backer.donations[_id];
+            campaign.amountSendToNgo += backer.donations[_id];
+            emit CancelFund(
+                _id,
+                campaign.amountNotYetSend,
+                campaign.amountSendToNgo
+            );
+        }
+    }
+
+    function releaseFund(uint256 _id, address _backerAddress) public payable {
+        Campaign storage campaign = campaigns[_id];
+        Backer storage backer = backers[_backerAddress];
+        require(_id < numberOfCampaigns);
+        require(block.timestamp < campaign.deadline);
+        uint256 backerDonations = backer.donations[_id];
+        if (backerDonations != 0) {
+            (bool sent, ) = payable(campaign.owner).call{
+                value: backerDonations
+            }("");
+            require(sent, "Failed to send Ether");
+            backer.donations[_id] = 0;
+            campaign.amountNotYetSend -= backer.donations[_id];
+            campaign.amountSendToDonator += backer.donations[_id];
+            emit ReleaseFund(
+                _id,
+                campaign.amountNotYetSend,
+                campaign.amountSendToDonator
+            );
+        }
+    }
+
     function releaseFundForEndedCampaign(uint256 _id) public payable {
         Campaign storage campaign = campaigns[_id];
         require(_id < numberOfCampaigns, "current Id is not exit");
         require(campaign.amountNotYetSend > 0, "current Id is not exit");
-        // require(block.timestamp < campaign.deadline);
+        require(
+            block.timestamp > campaign.deadline,
+            "You can only use this function when campaign.dead is passed"
+        );
         if (campaign.amountNotYetSend > 0) {
             (bool sent, ) = payable(campaign.owner).call{
                 value: campaign.amountNotYetSend
