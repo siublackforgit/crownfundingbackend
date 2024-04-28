@@ -45,7 +45,7 @@ contract MyContract {
     // common var
 
     uint256 numberOfCampaigns = 0;
-    uint256[] campaignsID;
+    uint256[] public campaignsID;
 
     // event
 
@@ -297,56 +297,10 @@ contract MyContract {
         return activeCount;
     }
 
-    function getAllCampaignsId() public view returns (uint[] memory) {
+    function getAllCampaignsId() public view returns (uint256[] memory) {
         return campaignsID;
     }
 
-    // validation
+    // fund
 
-    function releaseFundsForEndedCampaigns() public payable {
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            Campaign storage campaign = campaigns[i];
-
-            if (
-                (block.timestamp > campaign.deadline) &&
-                campaign.amountNotYetSend > 0
-            ) {
-                (bool sent, ) = payable(campaign.owner).call{
-                    value: campaign.amountNotYetSend
-                }("");
-                require(sent, "Failed to send Ether");
-                campaign.amountSendToDonator =
-                    campaign.amountSendToDonator +
-                    campaign.amountNotYetSend;
-                campaign.amountNotYetSend = 0;
-                campaign.active = false;
-            }
-        }
-    }
-
-    function checkTargetForEndedCampaigns() public returns (bool) {
-        bool updated = false;
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            Campaign storage campaign = campaigns[i];
-
-            if (campaign.amountCollected == campaign.target) {
-                updated = true;
-                campaign.active = false;
-            }
-        }
-        return updated;
-    }
-
-    function checkDeadline() public returns (bool) {
-        bool updated = false;
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            Campaign storage campaign = campaigns[i];
-
-            if (block.timestamp > campaign.deadline) {
-                updated = true;
-                campaign.active = false;
-            }
-        }
-        return updated;
-    }
 }
