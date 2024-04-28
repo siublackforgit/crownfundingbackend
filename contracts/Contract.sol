@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED dwadaa
 pragma solidity ^0.8.9;
 
-// struct
 contract MyContract {
+    // struct
     struct Campaign {
         address owner;
         uint256 campaignId;
@@ -15,13 +15,14 @@ contract MyContract {
         string description;
         uint256 amountCollected;
         uint256 amountNotYetSend;
-        ProofOfWork [] proofsOfWork;
+        uint256 amountSendToDonator;
+        uint256 amountSendToNgo;
+        ProofOfWork[] proofsOfWork;
         string image;
         address[] donators;
         uint256[] donations;
         bool[] donationReleased;
-        uint256 amountSendToDonator;
-        uint256 amountSendToNgo;
+        bool active;
     }
 
     struct Backer {
@@ -30,16 +31,23 @@ contract MyContract {
         mapping(uint256 => uint256) donations;
     }
 
-        struct ProofOfWork {
+    struct ProofOfWork {
         string dataType;
         string content;
         string description;
     }
 
+    // mapping
+
     mapping(address => Backer) public backers;
     mapping(uint256 => Campaign) public campaigns;
 
+    // common var
+
     uint256 numberOfCampaigns = 0;
+    uint256[] campaignsID;
+
+    // event
 
     event AmountCollectedUpdated(uint256 campaignId, uint256 amountCollected);
     event ReleaseFund(
@@ -52,6 +60,8 @@ contract MyContract {
         uint256 amountNotYetSend,
         uint256 amountSendToNgo
     );
+
+    // function
 
     function createCampaign(
         address _owner,
@@ -74,7 +84,9 @@ contract MyContract {
         campaign.deadline = _deadline;
         campaign.description = _description;
         campaign.campaignId = numberOfCampaigns++;
+        campaign.active = true;
 
+        campaignsID.push(campaign.campaignId);
         numberOfCampaigns++;
         return numberOfCampaigns - 1;
     }
@@ -88,8 +100,14 @@ contract MyContract {
             block.timestamp < campaign.deadline,
             "The funding deadline has passed."
         );
-        require(campaign.amountCollected <= campaign.target,"Campaign already reach its target");
-        require(campaign.amountCollected + amount <= campaign.target,"Donation cannot exceeds the campaign target.");
+        require(
+            campaign.amountCollected <= campaign.target,
+            "Campaign already reach its target"
+        );
+        require(
+            campaign.amountCollected + amount <= campaign.target,
+            "Donation cannot exceeds the campaign target."
+        );
         require(amount > 0, "Donation amount must be greater than zero");
 
         campaign.donators.push(msg.sender);
@@ -115,25 +133,24 @@ contract MyContract {
         emit AmountCollectedUpdated(_id, msg.value);
     }
 
-    function getCampaign(
-        uint256 _id
-    )
-        public
-        view
-        returns (
-            address owner,
-            uint256 campaignId,
-            string memory title,
-            string memory description,
-            uint256 target,
-            uint256 deadline,
-            uint256 amountCollected,
-            uint256 amountNotYetSend,
-            string memory image
-        )
-    {
+    function getCampaign(uint256 _id) public view returns (
+        address owner,
+        uint256 campaignId,
+        string memory title,
+        string memory description,
+        uint256 target,
+        uint256 deadline,
+        uint256 amountCollected,
+        uint256 amountNotYetSend,
+        string memory image,
+        string memory emailAddress,
+        string memory imgAddress,
+        string memory videoAddress,
+        uint256 amountSendToDonator,
+        uint256 amountSendToNgo,
+        bool active
+    ) {
         require(_id < numberOfCampaigns, "Campaign does not exist.");
-
         Campaign storage campaign = campaigns[_id];
         return (
             campaign.owner,
@@ -144,7 +161,13 @@ contract MyContract {
             campaign.deadline,
             campaign.amountCollected,
             campaign.amountNotYetSend,
-            campaign.image
+            campaign.image,
+            campaign.emailAddress,
+            campaign.imgAddress,
+            campaign.videoAddress,
+            campaign.amountSendToDonator,
+            campaign.amountSendToNgo,
+            campaign.active
         );
     }
 
@@ -204,18 +227,6 @@ contract MyContract {
         }
     }
 
-    function releaseFundsForEndedCampaigns() public payable {
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            Campaign storage campaign = campaigns[i];
-
-            (bool sent, ) = payable(campaign.owner).call{
-                value: campaign.amountNotYetSend
-            }("");
-            require(sent, "Failed to send Ether");
-            campaign.amountNotYetSend = 0;
-        }
-    }
-
     function displayFund(
         uint256 _id,
         address _backerAddress
@@ -270,52 +281,93 @@ contract MyContract {
     function getActiveCampaignCount() public view returns (uint256) {
         uint256 activeCount = 0;
         for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            if (campaigns[i].deadline > block.timestamp) {
+            if (
+                (campaigns[i].deadline > block.timestamp) &&
+                (campaigns[i].active == true)
+            ) {
                 activeCount++;
             }
         }
         return activeCount;
     }
 
-    function getActiveCampaignList() public view returns (Campaign[] memory) {
-        uint256 activeCount = 0;
-
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            if (campaigns[i].deadline > block.timestamp) {
-                activeCount++;
-            }
-        }
-
-        Campaign[] memory activeCampaigns = new Campaign[](activeCount);
-
-        uint256 j = 0;
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            if (campaigns[i].deadline > block.timestamp) {
-                Campaign storage c = campaigns[i];
-                activeCampaigns[j] = Campaign({
-                    campaignId: c.campaignId,
-                    owner: c.owner,
-                    emailAddress: c.emailAddress,
-                    imgAddress: c.imgAddress,
-                    title: c.title,
-                    target: c.target,
-                    videoAddress: c.videoAddress,
-                    deadline: c.deadline,
-                    description: c.description,
-                    amountCollected: c.amountCollected,
-                    amountNotYetSend: c.amountNotYetSend,
-                    proofsOfWork: c.proofsOfWork,
-                    image: c.image,
-                    donators: c.donators,
-                    donations: c.donations,
-                    donationReleased: c.donationReleased,
-                    amountSendToDonator: c.amountSendToDonator,
-                    amountSendToNgo: c.amountSendToNgo
-                });
-                j++;
-            }
-        }
-
-        return activeCampaigns;
+    function getAllCampaignsId() public view returns (uint[] memory) {
+        return campaignsID;
     }
+
+    function releaseFundsForEndedCampaigns() public payable {
+        for (uint256 i = 0; i < numberOfCampaigns; i++) {
+            Campaign storage campaign = campaigns[i];
+
+            if (
+                (block.timestamp > campaign.deadline) &&
+                campaign.amountNotYetSend > 0
+            ) {
+                (bool sent, ) = payable(campaign.owner).call{
+                    value: campaign.amountNotYetSend
+                }("");
+                require(sent, "Failed to send Ether");
+                campaign.amountSendToDonator =
+                    campaign.amountSendToDonator +
+                    campaign.amountNotYetSend;
+                campaign.amountNotYetSend = 0;
+                campaign.active = false;
+            }
+        }
+    }
+
+    function checkTargetForEndedCampaigns() public returns (bool) {
+        bool updated = false;
+        for (uint256 i = 0; i < numberOfCampaigns; i++) {
+            Campaign storage campaign = campaigns[i];
+
+            if (campaign.amountCollected == campaign.target) {
+                updated = true;
+                return campaign.active = false;
+            }
+        }
+        return updated;
+    }
+
+    // function getCampaignList() public view returns (Campaign[] memory) {
+    //     // uint256 activeCount = 0;
+
+    //     // for (uint256 i = 0; i < numberOfCampaigns; i++) {
+    //     //     if ((campaigns[i].deadline > block.timestamp) && (campaigns[i].active == true )) {
+    //     //         activeCount++;
+    //     //     }
+    //     // }
+    //     // Campaign[] memory activeCampaigns = new Campaign[](activeCount);
+
+    //     uint256 j = 0;
+    //     for (uint256 i = 0; i < numberOfCampaigns; i++) {
+    //         // if (campaigns[i].deadline > block.timestamp) {
+    //             Campaign storage c = campaigns[i];
+    //             // activeCampaigns[j] = Campaign({
+    //             //     campaignId: c.campaignId,
+    //             //     owner: c.owner,
+    //             //     emailAddress: c.emailAddress,
+    //             //     imgAddress: c.imgAddress,
+    //             //     title: c.title,
+    //             //     target: c.target,
+    //             //     videoAddress: c.videoAddress,
+    //             //     deadline: c.deadline,
+    //             //     description: c.description,
+    //             //     amountCollected: c.amountCollected,
+    //             //     amountNotYetSend: c.amountNotYetSend,
+    //             //     proofsOfWork: c.proofsOfWork,
+    //             //     image: c.image,
+    //             //     donators: c.donators,
+    //             //     donations: c.donations,
+    //             //     donationReleased: c.donationReleased,
+    //             //     amountSendToDonator: c.amountSendToDonator,
+    //             //     amountSendToNgo: c.amountSendToNgo,
+    //             //     active: c.active
+    //             // });
+    //             i++;
+    //         // }
+    //     }
+
+    //     return activeCampaigns;
+    // }
 }
