@@ -5,6 +5,7 @@ contract MyContract {
     // struct
     struct Campaign {
         address owner;
+        address signer;
         uint256 campaignId;
         string emailAddress;
         string imgAddress;
@@ -66,12 +67,20 @@ contract MyContract {
         uint256 amountSendToDonator
     );
 
+    event ProofOfWorkAdded(
+        uint256 indexed campaignId,
+        string dataType,
+        string content,
+        string description
+    );
+
     // function
 
     // create
 
     function createCampaign(
         address _owner,
+        address _signer,
         string memory _emailAddress,
         string memory _imgAddress,
         string memory _title,
@@ -83,6 +92,7 @@ contract MyContract {
         require(_deadline > block.timestamp, "Deadline must be in the future");
         Campaign storage campaign = campaigns[numberOfCampaigns];
         campaign.owner = _owner;
+        campaign.signer = _signer;
         campaign.emailAddress = _emailAddress;
         campaign.imgAddress = _imgAddress;
         campaign.title = _title;
@@ -102,6 +112,32 @@ contract MyContract {
         return numberOfCampaigns - 1;
     }
 
+    function addProofOfWork(
+        uint256 campaignId,
+        string memory dataType,
+        string memory content,
+        string memory description
+    ) public {
+        // Require that the sender is the owner of the campaign
+        require(
+            msg.sender == campaigns[campaignId].signer,
+            "Only campaign owner can add proofs of work"
+        );
+
+        // Create a new ProofOfWork
+        ProofOfWork memory newProof = ProofOfWork({
+            dataType: dataType,
+            content: content,
+            description: description
+        });
+
+        // Add the new ProofOfWork to the campaign
+        campaigns[campaignId].proofsOfWork.push(newProof);
+
+        // Emit the event
+        emit ProofOfWorkAdded(campaignId, dataType, content, description);
+    }
+
     // display
 
     function getCampaign(
@@ -112,6 +148,7 @@ contract MyContract {
         returns (
             address owner,
             uint256 campaignId,
+            address signer,
             string memory title,
             string memory description,
             uint256 target,
@@ -132,6 +169,7 @@ contract MyContract {
         return (
             campaign.owner,
             campaign.campaignId,
+            campaign.signer,
             campaign.title,
             campaign.description,
             campaign.target,
@@ -148,13 +186,21 @@ contract MyContract {
         );
     }
 
-    function displayBackerCampaigns(
-        address _backerAddress
-    ) public view returns (uint256[] memory) {
-        Backer storage backer = backers[_backerAddress];
-
-        return backer.campaignsBacked;
+    function getAllCampaigns() public view returns (uint256) {
+        return numberOfCampaigns;
     }
+
+    function getAllCampaignsId() public view returns (uint256[] memory) {
+        return campaignsID;
+    }
+
+    // function displayBackerCampaigns(
+    //     address _backerAddress
+    // ) public view returns (uint256[] memory) {
+    //     Backer storage backer = backers[_backerAddress];
+
+    //     return backer.campaignsBacked;
+    // }
 
     function displayFund(
         uint256 _id,
@@ -168,17 +214,13 @@ contract MyContract {
         return backerDonations;
     }
 
-    function getAllCampaigns() public view returns (uint256) {
-        return numberOfCampaigns;
-    }
-
-    function getTotalFundsRaised() public view returns (uint256) {
-        uint256 totalFundsRaised = 0;
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            totalFundsRaised += campaigns[i].amountCollected;
-        }
-        return totalFundsRaised;
-    }
+    // function getTotalFundsRaised() public view returns (uint256) {
+    //     uint256 totalFundsRaised = 0;
+    //     for (uint256 i = 0; i < numberOfCampaigns; i++) {
+    //         totalFundsRaised += campaigns[i].amountCollected;
+    //     }
+    //     return totalFundsRaised;
+    // }
 
     function getActiveCampaignCount() public view returns (uint256) {
         uint256 activeCount = 0;
@@ -193,8 +235,10 @@ contract MyContract {
         return activeCount;
     }
 
-    function getAllCampaignsId() public view returns (uint256[] memory) {
-        return campaignsID;
+    function getProofsOfWork(
+        uint256 campaignId
+    ) public view returns (ProofOfWork[] memory) {
+        return campaigns[campaignId].proofsOfWork;
     }
 
     // fund
@@ -250,6 +294,7 @@ contract MyContract {
         Backer storage backer = backers[_backerAddress];
         require(_id < numberOfCampaigns);
         require(block.timestamp < campaign.deadline);
+        require(campaign.amountNotYetSend > 0, "current Id has no fund left");
         uint256 backerDonations = backer.donations[_id];
         if (backerDonations != 0) {
             (bool sent, ) = payable(_ngoAddress).call{value: backerDonations}(
@@ -272,6 +317,7 @@ contract MyContract {
         Backer storage backer = backers[_backerAddress];
         require(_id < numberOfCampaigns);
         require(block.timestamp < campaign.deadline);
+        require(campaign.amountNotYetSend > 0, "current Id has no fund left");
         uint256 backerDonations = backer.donations[_id];
         if (backerDonations != 0) {
             (bool sent, ) = payable(campaign.owner).call{
@@ -292,7 +338,7 @@ contract MyContract {
     function releaseFundForEndedCampaign(uint256 _id) public payable {
         Campaign storage campaign = campaigns[_id];
         require(_id < numberOfCampaigns, "current Id is not exit");
-        require(campaign.amountNotYetSend > 0, "current Id is not exit");
+        require(campaign.amountNotYetSend > 0, "current Id has no fund left");
         require(
             block.timestamp > campaign.deadline,
             "You can only use this function when campaign.dead is passed"
