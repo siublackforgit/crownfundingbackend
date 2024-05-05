@@ -301,9 +301,9 @@ contract MyContract {
                 ""
             );
             require(sent, "Failed to send Ether");
+            campaign.amountNotYetSend = campaign.amountNotYetSend - backer.donations[_id];
+            campaign.amountSendToNgo = campaign.amountSendToNgo + backer.donations[_id];
             backer.donations[_id] = 0;
-            campaign.amountNotYetSend -= backer.donations[_id];
-            campaign.amountSendToNgo += backer.donations[_id];
             emit CancelFund(
                 _id,
                 campaign.amountNotYetSend,
@@ -324,9 +324,13 @@ contract MyContract {
                 value: backerDonations
             }("");
             require(sent, "Failed to send Ether");
+            campaign.amountNotYetSend =
+                campaign.amountNotYetSend -
+                backer.donations[_id];
+            campaign.amountSendToDonator =
+                campaign.amountSendToDonator +
+                backer.donations[_id];
             backer.donations[_id] = 0;
-            campaign.amountNotYetSend -= backer.donations[_id];
-            campaign.amountSendToDonator += backer.donations[_id];
             emit ReleaseFund(
                 _id,
                 campaign.amountNotYetSend,
