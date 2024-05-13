@@ -20,10 +20,8 @@ contract MyContract {
         uint256 amountSendToNgo;
         ProofOfWork[] proofsOfWork;
         string image;
-        address[] donators;
-        uint256[] donations;
-        bool[] donationReleased;
-        bool active;
+        // address[] donators;
+        // uint256[] donations;
     }
 
     struct Backer {
@@ -105,8 +103,6 @@ contract MyContract {
         campaign.amountNotYetSend = 0;
         campaign.amountSendToDonator = 0;
         campaign.amountSendToNgo = 0;
-        campaign.active = true;
-
         campaignsID.push(campaign.campaignId);
         numberOfCampaigns++;
         return numberOfCampaigns - 1;
@@ -160,8 +156,7 @@ contract MyContract {
             string memory imgAddress,
             string memory videoAddress,
             uint256 amountSendToDonator,
-            uint256 amountSendToNgo,
-            bool active
+            uint256 amountSendToNgo
         )
     {
         require(_id < numberOfCampaigns, "Campaign does not exist.");
@@ -181,8 +176,7 @@ contract MyContract {
             campaign.imgAddress,
             campaign.videoAddress,
             campaign.amountSendToDonator,
-            campaign.amountSendToNgo,
-            campaign.active
+            campaign.amountSendToNgo
         );
     }
 
@@ -214,26 +208,6 @@ contract MyContract {
         return backerDonations;
     }
 
-    // function getTotalFundsRaised() public view returns (uint256) {
-    //     uint256 totalFundsRaised = 0;
-    //     for (uint256 i = 0; i < numberOfCampaigns; i++) {
-    //         totalFundsRaised += campaigns[i].amountCollected;
-    //     }
-    //     return totalFundsRaised;
-    // }
-
-    function getActiveCampaignCount() public view returns (uint256) {
-        uint256 activeCount = 0;
-        for (uint256 i = 0; i < numberOfCampaigns; i++) {
-            if (
-                (campaigns[i].deadline > block.timestamp) &&
-                (campaigns[i].active == true)
-            ) {
-                activeCount++;
-            }
-        }
-        return activeCount;
-    }
 
     function getProofsOfWork(
         uint256 campaignId
@@ -261,9 +235,6 @@ contract MyContract {
             "Donation cannot exceeds the campaign target."
         );
         require(amount > 0, "Donation amount must be greater than zero");
-
-        campaign.donators.push(msg.sender);
-        campaign.donations.push(amount);
 
         backer.owner = msg.sender;
         backer.donations[_id] += msg.value;
